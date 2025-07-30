@@ -27,7 +27,7 @@ func NewPaymentRepository(db *sql.DB) PaymentRepository {
 func (r *paymentRepository) InsertPayment(ctx context.Context, p *model.Payment) error {
 	query := `
 		INSERT INTO payments (correlation_id, amount, processed_by, requested_at)
-        VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, $3, $4)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		p.CorrelationId,
@@ -44,14 +44,14 @@ func (r *paymentRepository) InsertPayment(ctx context.Context, p *model.Payment)
 func (r *paymentRepository) GetSummary(ctx context.Context, from *time.Time, to *time.Time) (model.PaymentSummaryResponse, error) {
 	query := `
 		SELECT
-                processed_by AS ProcessedBy,
-                COUNT(*) AS TotalRequests,
-                SUM(amount) AS TotalAmount
-            FROM payments
-            WHERE
-                ($1::timestamp IS NULL OR requested_at >= $1)
-                AND ($2::timestamp IS NULL OR requested_at <= $2)
-            GROUP BY processed_by;
+			processed_by AS ProcessedBy,
+			COUNT(*) AS TotalRequests,
+			SUM(amount) AS TotalAmount
+		FROM payments
+		WHERE
+		($1::timestamp IS NULL OR requested_at >= $1)
+		AND ($2::timestamp IS NULL OR requested_at <= $2)
+		GROUP BY processed_by;
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, from, to)

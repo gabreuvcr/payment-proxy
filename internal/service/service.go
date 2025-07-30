@@ -14,19 +14,19 @@ type PaymentService interface {
 }
 
 type paymentService struct {
-	repo repository.PaymentRepository
+	r repository.PaymentRepository
 }
 
 func NewPaymentService(repo repository.PaymentRepository) PaymentService {
 	return &paymentService{
-		repo: repo,
+		r: repo,
 	}
 }
 
 func (s *paymentService) CreatePayment(ctx context.Context, p *model.Payment) error {
-	return s.repo.InsertPayment(ctx, p)
+	return s.r.InsertPayment(ctx, p)
 }
 
 func (s *paymentService) GetSummary(ctx context.Context, from *time.Time, to *time.Time) (model.PaymentSummaryResponse, error) {
-	return s.repo.GetSummary(ctx, from, to)
+	return s.r.GetSummary(ctx, from, to)
 }
