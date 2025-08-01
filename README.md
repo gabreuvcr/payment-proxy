@@ -6,4 +6,6 @@ Projeto da [rinha-de-backend-2025](https://github.com/zanfranceschi/rinha-de-bac
 
 ## Tecnologias utilizadas:
 - **Linguagem**: Go
+- **Queue + Cache**: Redis
 - **Database**: PostgreSQL
+- **Load Balancer**: Nginx

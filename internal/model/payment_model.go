@@ -4,13 +4,6 @@ import (
 	"time"
 )
 
-type Processor int16
-
-const (
-	ProcessorDefault  Processor = 0
-	ProcessorFallback Processor = 1
-)
-
 type Payment struct {
 	CorrelationId string
 	Amount        float64

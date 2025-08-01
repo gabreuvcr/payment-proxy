@@ -2,13 +2,11 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gabreuvcr/proxy-payment/internal/model"
 	"github.com/gabreuvcr/proxy-payment/internal/service"
-	"github.com/gabreuvcr/proxy-payment/internal/util"
 )
 
 type PaymentHandler struct {
@@ -24,7 +22,6 @@ func NewPaymentHandler(s service.PaymentService) *PaymentHandler {
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	var paymentDto model.CreatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentDto); err != nil {
-		log.Println("Error [json.NewDecoder.Decode]: ", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -32,11 +29,10 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	var payment = model.Payment{
 		CorrelationId: paymentDto.CorrelationId,
 		Amount:        paymentDto.Amount,
-		ProcessedBy:   util.RandomProcessor(),
 		RequestedAt:   time.Now().UTC(),
 	}
 
-	if err := h.s.CreatePayment(r.Context(), &payment); err != nil {
+	if err := h.s.EnqueuePayment(r.Context(), &payment); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
