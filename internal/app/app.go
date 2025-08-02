@@ -37,8 +37,9 @@ func Run() error {
 	paymentService := service.NewPaymentService(repo, paymentsQueue)
 	paymentHandler := handler.NewPaymentHandler(paymentService)
 
-	mux.HandleFunc("GET /payments", paymentHandler.CreatePayment)
-	mux.HandleFunc("POST /payments-summary", paymentHandler.GetSummary)
+	mux.HandleFunc("/payments", paymentHandler.CreatePayment)
+	mux.HandleFunc("/payments-summary", paymentHandler.GetSummary)
+	mux.HandleFunc("/ping", paymentHandler.Pong)
 
 	log.Println("Server running at :9999")
 	return http.ListenAndServe(":9999", mux)

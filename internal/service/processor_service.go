@@ -73,7 +73,7 @@ func (p *ProcessorService) IsHealthy() bool {
 	return true
 }
 
-func (p *ProcessorService) Process(payment model.Payment) error {
+func (p *ProcessorService) ProcessPayment(payment model.Payment) error {
 	ctx := context.Background()
 
 	data, err := json.Marshal(payment)

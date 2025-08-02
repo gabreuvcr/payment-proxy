@@ -20,6 +20,11 @@ func NewPaymentHandler(s service.PaymentService) *PaymentHandler {
 }
 
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var paymentDto model.CreatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentDto); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -41,6 +46,11 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	queryFrom := r.URL.Query().Get("from")
 	queryTo := r.URL.Query().Get("to")
 
@@ -72,4 +82,15 @@ func (h *PaymentHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *PaymentHandler) Pong(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 }
