@@ -31,11 +31,12 @@ func Run() error {
 
 	defaultProcessorService := service.NewProcessorService(defaultBaseUrl, redis, "health:default")
 	fallbackProcessorService := service.NewProcessorService(fallbackBaseUrl, redis, "health:fallback")
-	worker := worker.NewWorker(repo, paymentsQueue, defaultProcessorService, fallbackProcessorService)
-	worker.StartWorkers(10)
-
 	paymentService := service.NewPaymentService(repo, paymentsQueue)
+
 	paymentHandler := handler.NewPaymentHandler(paymentService)
+	
+	worker := worker.NewWorker(paymentService, defaultProcessorService, fallbackProcessorService)
+	worker.StartWorkers(10)
 
 	mux.HandleFunc("/payments", paymentHandler.CreatePayment)
 	mux.HandleFunc("/payments-summary", paymentHandler.GetSummary)

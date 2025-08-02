@@ -12,15 +12,20 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type ProcessorService struct {
+type ProcessorService interface {
+	IsHealthy() bool
+	ProcessPayment(payment model.Payment) error
+}
+
+type processorService struct {
 	baseURL    string
 	redis      *redis.Client
 	httpClient *http.Client
 	healthKey  string
 }
 
-func NewProcessorService(baseURL string, redisClient *redis.Client, healthKey string) *ProcessorService {
-	return &ProcessorService{
+func NewProcessorService(baseURL string, redisClient *redis.Client, healthKey string) ProcessorService {
+	return &processorService{
 		baseURL:    baseURL,
 		redis:      redisClient,
 		httpClient: &http.Client{Timeout: 500 * time.Millisecond},
@@ -28,7 +33,7 @@ func NewProcessorService(baseURL string, redisClient *redis.Client, healthKey st
 	}
 }
 
-func (p *ProcessorService) IsHealthy() bool {
+func (p *processorService) IsHealthy() bool {
 	ctx := context.Background()
 
 	val, err := p.redis.Get(ctx, p.healthKey).Result()
@@ -73,7 +78,7 @@ func (p *ProcessorService) IsHealthy() bool {
 	return true
 }
 
-func (p *ProcessorService) ProcessPayment(payment model.Payment) error {
+func (p *processorService) ProcessPayment(payment model.Payment) error {
 	ctx := context.Background()
 
 	data, err := json.Marshal(payment)
