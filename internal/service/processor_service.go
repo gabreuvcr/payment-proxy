@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gabreuvcr/proxy-payment/internal/model"
-	"github.com/redis/go-redis/v9"
+	"github.com/gabreuvcr/proxy-payment/internal/repository"
 )
 
 type ProcessorService interface {
@@ -19,15 +19,15 @@ type ProcessorService interface {
 
 type processorService struct {
 	baseURL    string
-	redis      *redis.Client
+	repo       repository.PaymentRepository
 	httpClient *http.Client
 	healthKey  string
 }
 
-func NewProcessorService(baseURL string, redisClient *redis.Client, healthKey string) ProcessorService {
+func NewProcessorService(baseURL string, repo repository.PaymentRepository, healthKey string) ProcessorService {
 	return &processorService{
 		baseURL:    baseURL,
-		redis:      redisClient,
+		repo:       repo,
 		httpClient: &http.Client{Timeout: 500 * time.Millisecond},
 		healthKey:  healthKey,
 	}
@@ -36,26 +36,26 @@ func NewProcessorService(baseURL string, redisClient *redis.Client, healthKey st
 func (p *processorService) IsHealthy() bool {
 	ctx := context.Background()
 
-	val, err := p.redis.Get(ctx, p.healthKey).Result()
+	val, err := p.repo.GetHealth(ctx, p.healthKey)
 	if err == nil {
 		return val == "1"
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/payments/service-health", nil)
 	if err != nil {
-		p.redis.Set(ctx, p.healthKey, "0", 5*time.Second)
+		p.repo.SetUnhealthy(ctx, p.healthKey)
 		return false
 	}
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		p.redis.Set(ctx, p.healthKey, "0", 5*time.Second)
+		p.repo.SetUnhealthy(ctx, p.healthKey)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		p.redis.Set(ctx, p.healthKey, "0", 5*time.Second)
+		p.repo.SetUnhealthy(ctx, p.healthKey)
 		return false
 	}
 
@@ -65,16 +65,16 @@ func (p *processorService) IsHealthy() bool {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&serviceHealthResult); err != nil {
-		p.redis.Set(ctx, p.healthKey, "0", 5*time.Second)
+		p.repo.SetUnhealthy(ctx, p.healthKey)
 		return false
 	}
 
 	if serviceHealthResult.Failing {
-		p.redis.Set(ctx, p.healthKey, "0", 5*time.Second)
+		p.repo.SetUnhealthy(ctx, p.healthKey)
 		return false
 	}
 
-	p.redis.Set(ctx, p.healthKey, "1", 5*time.Second)
+	p.repo.SetHealthy(ctx, p.healthKey)
 	return true
 }
 
@@ -98,7 +98,7 @@ func (p *processorService) ProcessPayment(payment model.Payment) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("processor at %s returned status %d", p.baseURL, resp.StatusCode)
 	}
 

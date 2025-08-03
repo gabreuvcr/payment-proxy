@@ -57,21 +57,21 @@ func (h *PaymentHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	var from, to *time.Time
 
 	if queryFrom != "" {
-		t, err := time.Parse(time.RFC3339, queryFrom)
-		if err != nil {
+		if t, err := time.Parse(time.RFC3339, queryFrom); err == nil {
+			from = &t
+		} else {
 			http.Error(w, "Invalid 'from' date format. Use RFC3339.", http.StatusBadRequest)
 			return
 		}
-		from = &t
 	}
 
 	if queryTo != "" {
-		t, err := time.Parse(time.RFC3339, queryTo)
-		if err != nil {
+		if t, err := time.Parse(time.RFC3339, queryTo); err == nil {
+			to = &t
+		} else {
 			http.Error(w, "Invalid 'to' date format. Use RFC3339.", http.StatusBadRequest)
 			return
 		}
-		to = &t
 	}
 
 	response, err := h.s.GetSummary(r.Context(), from, to)

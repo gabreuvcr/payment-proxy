@@ -3,24 +3,37 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
 	"github.com/gabreuvcr/proxy-payment/internal/model"
+	"github.com/redis/go-redis/v9"
 )
 
 type PaymentRepository interface {
 	InsertPayment(ctx context.Context, p *model.Payment) error
 	GetSummary(ctx context.Context, from *time.Time, to *time.Time) (model.PaymentSummaryResponse, error)
+
+	Enqueue(ctx context.Context, payment model.Payment) error
+	Dequeue() (model.Payment, error)
+	GetHealth(ctx context.Context, healthKey string) (string, error)
+	SetHealthy(ctx context.Context, healthKey string)
+	SetUnhealthy(ctx context.Context, healthKey string)
 }
 
 type paymentRepository struct {
-	db *sql.DB
+	db       *sql.DB
+	redis    *redis.Client
+	queueKey string
 }
 
-func NewPaymentRepository(db *sql.DB) PaymentRepository {
+func NewPaymentRepository(db *sql.DB, redis *redis.Client) PaymentRepository {
 	return &paymentRepository{
-		db: db,
+		db:       db,
+		redis:    redis,
+		queueKey: "queue:payment",
 	}
 }
 
@@ -92,4 +105,48 @@ func (r *paymentRepository) GetSummary(ctx context.Context, from *time.Time, to 
 		}
 	}
 	return summaryResponse, nil
+}
+
+func (q *paymentRepository) Enqueue(ctx context.Context, payment model.Payment) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	data, err := json.Marshal(payment)
+	if err != nil {
+		return err
+	}
+
+	return q.redis.LPush(ctx, q.queueKey, data).Err()
+}
+
+func (q *paymentRepository) Dequeue() (model.Payment, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	data, err := q.redis.RPop(ctx, q.queueKey).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return model.Payment{}, errors.New("queue is empty")
+		}
+		return model.Payment{}, err
+	}
+
+	var p model.Payment
+	if err := json.Unmarshal([]byte(data), &p); err != nil {
+		return model.Payment{}, err
+	}
+
+	return p, nil
+}
+
+func (q *paymentRepository) GetHealth(ctx context.Context, healthKey string) (string, error) {
+	return q.redis.Get(ctx, healthKey).Result()
+}
+
+func (q *paymentRepository) SetHealthy(ctx context.Context, healthKey string) {
+	q.redis.Set(ctx, healthKey, "1", 5*time.Second)
+}
+
+func (q *paymentRepository) SetUnhealthy(ctx context.Context, healthKey string) {
+	q.redis.Set(ctx, healthKey, "0", 5*time.Second)
 }

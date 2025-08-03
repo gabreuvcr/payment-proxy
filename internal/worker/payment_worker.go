@@ -10,31 +10,35 @@ import (
 	"github.com/gabreuvcr/proxy-payment/internal/util"
 )
 
-type Worker struct {
+type PaymentQueueConsumer interface {
+	StartQueueConsumers(n int)
+}
+
+type paymentQueueConsumer struct {
 	paymentService    service.PaymentService
 	defaultProcessor  service.ProcessorService
 	fallbackProcessor service.ProcessorService
 }
 
-func NewWorker(
+func NewPaymentQueueConsumer(
 	paymentService service.PaymentService,
-	defaultProc service.ProcessorService,
-	fallbackProc service.ProcessorService,
-) *Worker {
-	return &Worker{
+	defaultProcessor service.ProcessorService,
+	fallbackProcessor service.ProcessorService,
+) PaymentQueueConsumer {
+	return &paymentQueueConsumer{
 		paymentService:    paymentService,
-		defaultProcessor:  defaultProc,
-		fallbackProcessor: fallbackProc,
+		defaultProcessor:  defaultProcessor,
+		fallbackProcessor: fallbackProcessor,
 	}
 }
 
-func (w *Worker) StartWorkers(n int) {
-	for i := range n {
-		go w.workerLoop(i)
+func (w *paymentQueueConsumer) StartQueueConsumers(n int) {
+	for workerID := range n {
+		go w.consumeQueue(workerID)
 	}
 }
 
-func (w *Worker) workerLoop(id int) error {
+func (w *paymentQueueConsumer) consumeQueue(workerID int) error {
 	for {
 		ctx := context.Background()
 
@@ -44,25 +48,25 @@ func (w *Worker) workerLoop(id int) error {
 			continue
 		}
 
-		log.Printf("[Worker %d] Processing payment %s\n", id, payment.CorrelationId)
+		log.Printf("[Worker %d] Processing payment %s\n", workerID, payment.CorrelationId)
 
 		processorUsed, err := w.processPayment(payment)
 		if err != nil {
-			log.Printf("[Worker %d] ERROR trying process payment: %v\n", id, err)
+			log.Printf("[Worker %d] ERROR trying process payment: %v\n", workerID, err)
 			continue
 		}
 
 		payment.ProcessedBy = processorUsed
 
 		if err := w.paymentService.InsertPayment(ctx, &payment); err != nil {
-			log.Printf("[Worker %d] ERROR trying insert into database: %v\n", id, err)
+			log.Printf("[Worker %d] ERROR trying insert into database: %v\n", workerID, err)
 		} else {
-			log.Printf("[Worker %d] Payment %s processed by %d\n", id, payment.CorrelationId, payment.ProcessedBy)
+			log.Printf("[Worker %d] Payment %s processed by %d\n", workerID, payment.CorrelationId, payment.ProcessedBy)
 		}
 	}
 }
 
-func (w *Worker) processPayment(p model.Payment) (model.Processor, error) {
+func (w *paymentQueueConsumer) processPayment(p model.Payment) (model.Processor, error) {
 	return util.RandomProcessor(), nil
 
 	// if w.defaultProcessor.IsHealthy() {

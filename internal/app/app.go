@@ -7,7 +7,6 @@ import (
 
 	"github.com/gabreuvcr/proxy-payment/internal/handler"
 	"github.com/gabreuvcr/proxy-payment/internal/infra"
-	"github.com/gabreuvcr/proxy-payment/internal/queue"
 	"github.com/gabreuvcr/proxy-payment/internal/repository"
 	"github.com/gabreuvcr/proxy-payment/internal/service"
 	"github.com/gabreuvcr/proxy-payment/internal/worker"
@@ -20,23 +19,21 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-
 	redis := infra.NewRedis()
 
-	paymentsQueue := queue.NewPaymentQueue(redis)
-	repo := repository.NewPaymentRepository(db)
+	repo := repository.NewPaymentRepository(db, redis)
 
 	defaultBaseUrl := os.Getenv("DEFAULT_PROCESSOR_BASE_URL")
 	fallbackBaseUrl := os.Getenv("FALLBACK_PROCESSOR_BASE_URL")
 
-	defaultProcessorService := service.NewProcessorService(defaultBaseUrl, redis, "health:default")
-	fallbackProcessorService := service.NewProcessorService(fallbackBaseUrl, redis, "health:fallback")
-	paymentService := service.NewPaymentService(repo, paymentsQueue)
+	defaultProcessorService := service.NewProcessorService(defaultBaseUrl, repo, "health:default")
+	fallbackProcessorService := service.NewProcessorService(fallbackBaseUrl, repo, "health:fallback")
+	paymentService := service.NewPaymentService(repo)
 
 	paymentHandler := handler.NewPaymentHandler(paymentService)
-	
-	worker := worker.NewWorker(paymentService, defaultProcessorService, fallbackProcessorService)
-	worker.StartWorkers(10)
+
+	worker := worker.NewPaymentQueueConsumer(paymentService, defaultProcessorService, fallbackProcessorService)
+	worker.StartQueueConsumers(10)
 
 	mux.HandleFunc("/payments", paymentHandler.CreatePayment)
 	mux.HandleFunc("/payments-summary", paymentHandler.GetSummary)
